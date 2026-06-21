@@ -68,6 +68,14 @@ public:
     uint8_t slave_id,
     const std::array<float, kJointCount> & positions_deg) -> bool;
 
+  // Thin wrappers around revo3_clear_motor_errors / auto_clear SDK calls.
+  [[nodiscard]] auto clear_motor_errors(uint8_t slave_id) -> bool;
+
+  [[nodiscard]] auto set_auto_clear_motor_error(uint8_t slave_id, bool enabled) -> bool;
+
+  [[nodiscard]] auto get_auto_clear_motor_error(uint8_t slave_id) const
+    -> std::optional<bool>;
+
 private:
   Revo3Api::DriverConfig & config_;
 

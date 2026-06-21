@@ -137,6 +137,15 @@ public:
   [[nodiscard]] auto send_position_command(
     uint8_t slave_id, const std::array<float, kJointCount> & positions_deg) -> bool;
 
+  // Motor fault recovery (SDK maintenance; also used from on_configure today).
+  // Intended for future GPIO-triggered runtime clear — see Revo3HandHardware::on_configure.
+  [[nodiscard]] auto clear_motor_errors(uint8_t slave_id) -> bool;
+
+  [[nodiscard]] auto set_auto_clear_motor_error(uint8_t slave_id, bool enabled) -> bool;
+
+  [[nodiscard]] auto get_auto_clear_motor_error(uint8_t slave_id) const
+    -> std::optional<bool>;
+
   [[nodiscard]] auto resolved_connection() const -> std::optional<ConnectionInfo>;
 
 private:

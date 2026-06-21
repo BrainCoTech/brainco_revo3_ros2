@@ -5,9 +5,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -191,6 +193,47 @@ auto Revo3HandHardware::on_configure(const rclcpp_lifecycle::State & /*prev*/)
       dev_info.hardware_version.c_str(),
       dev_info.firmware_version.c_str(),
       dev_info.serial_number.c_str());
+  }
+
+  // ── Motor fault recovery (startup only) ───────────────────────────────────
+  // SDK: revo3_clear_motor_errors + revo3_set_auto_clear_motor_error.
+  // Called here after connect so a hand left in overcurrent/stall protection can
+  // recover without power cycling when the driver (re)starts.
+  //
+  // Not exposed as ros2_control GPIO / service yet. Future improvement:
+  //   - URDF <gpio name="device"> + command interfaces (clear_errors_cmd/result)
+  //   - revo3_device_controller exposing std_srvs/Trigger for runtime clear
+  //   - read()/write() executes SDK clear when GPIO cmd is set
+  // Then move runtime clear out of on_configure; keep only auto_clear enable here,
+  // or drop this block entirely if firmware auto_clear is sufficient.
+  const uint8_t slave_id = driver_config_.slave_id;
+
+  REVO3_LOG_INFO("Clearing Revo3 motor errors during configure (slave_id=%u)", slave_id);
+  if (!api_->clear_motor_errors(slave_id))
+  {
+    REVO3_LOG_ERROR("Failed to clear Revo3 motor errors during configure");
+    api_.reset();
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  REVO3_LOG_INFO("Enabling Revo3 auto clear motor errors (slave_id=%u)", slave_id);
+  if (!api_->set_auto_clear_motor_error(slave_id, true))
+  {
+    REVO3_LOG_ERROR("Failed to enable Revo3 auto clear motor errors");
+    api_.reset();
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  if (const auto enabled = api_->get_auto_clear_motor_error(slave_id))
+  {
+    REVO3_LOG_INFO(
+      "Revo3 auto clear motor errors confirmed: %s",
+      *enabled ? "enabled" : "disabled");
+  }
+  else
+  {
+    REVO3_LOG_WARN("Could not read back Revo3 auto clear motor errors state");
   }
 
   return hardware_interface::CallbackReturn::SUCCESS;

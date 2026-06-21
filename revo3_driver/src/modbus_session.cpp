@@ -396,4 +396,44 @@ bool ModbusSession::send_position_command(
   return true;
 }
 
+// ── Motor fault recovery (SDK maintenance) ───────────────────────────────────
+// See Revo3HandHardware::on_configure for call site and GPIO migration notes.
+
+bool ModbusSession::clear_motor_errors(uint8_t slave_id)
+{
+  if (!handle_)
+  {
+    return false;
+  }
+
+  ::revo3_clear_motor_errors(handle_.get(), slave_id);
+  return true;
+}
+
+bool ModbusSession::set_auto_clear_motor_error(uint8_t slave_id, bool enabled)
+{
+  if (!handle_)
+  {
+    return false;
+  }
+
+  ::revo3_set_auto_clear_motor_error(handle_.get(), slave_id, enabled);
+  return true;
+}
+
+std::optional<bool> ModbusSession::get_auto_clear_motor_error(uint8_t slave_id) const
+{
+  if (!handle_)
+  {
+    return std::nullopt;
+  }
+
+  const int value = ::revo3_get_auto_clear_motor_error(handle_.get(), slave_id);
+  if (value < 0)
+  {
+    return std::nullopt;
+  }
+  return value != 0;
+}
+
 }  // namespace revo3_driver

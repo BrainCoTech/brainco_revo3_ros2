@@ -184,6 +184,33 @@ auto Revo3Api::send_position_command(
   return impl_->session->send_position_command(slave_id, positions_deg);
 }
 
+auto Revo3Api::clear_motor_errors(uint8_t slave_id) -> bool
+{
+  if (!impl_ || !impl_->session)
+  {
+    return false;
+  }
+  return impl_->session->clear_motor_errors(slave_id);
+}
+
+auto Revo3Api::set_auto_clear_motor_error(uint8_t slave_id, bool enabled) -> bool
+{
+  if (!impl_ || !impl_->session)
+  {
+    return false;
+  }
+  return impl_->session->set_auto_clear_motor_error(slave_id, enabled);
+}
+
+auto Revo3Api::get_auto_clear_motor_error(uint8_t slave_id) const -> std::optional<bool>
+{
+  if (!impl_ || !impl_->session)
+  {
+    return std::nullopt;
+  }
+  return impl_->session->get_auto_clear_motor_error(slave_id);
+}
+
 // ── Resolved connection ──────────────────────────────────────────────────────
 
 auto Revo3Api::resolved_connection() const -> std::optional<ConnectionInfo>
