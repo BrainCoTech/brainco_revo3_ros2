@@ -14,6 +14,7 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "revo3_driver/logger_macros.hpp"
+#include "revo3_driver/mit_gains.hpp"
 
 // Unit conversion constants
 namespace
@@ -23,9 +24,6 @@ constexpr double kRadToDeg = 180.0 / M_PI;
 constexpr double kRpmToRadS = 2.0 * M_PI / 60.0;
 constexpr double kRadSToRpm = 60.0 / (2.0 * M_PI);
 constexpr double kMilliampToAmp = 1.0 / 1000.0;
-// Used when position-only controllers leave kp/kd unclaimed (zero stiffness = no motion).
-constexpr double kFallbackKp = 1.0;
-constexpr double kFallbackKd = 0.1;
 }  // namespace
 
 namespace revo3_driver
@@ -101,8 +99,8 @@ auto Revo3HandHardware::on_init(const hardware_interface::HardwareInfo & info)
   hw_cmd_positions_.fill(0.0);
   hw_cmd_velocities_.fill(0.0);
   hw_cmd_efforts_.fill(0.0);
-  hw_cmd_kp_.fill(0.0);
-  hw_cmd_kd_.fill(0.0);
+  hw_cmd_kp_.fill(kFallbackKp);
+  hw_cmd_kd_.fill(kFallbackKd);
 
   hw_state_positions_.fill(0.0);
   hw_state_velocities_.fill(0.0);
@@ -167,8 +165,8 @@ auto Revo3HandHardware::on_configure(const rclcpp_lifecycle::State & /*prev*/)
   hw_cmd_positions_.fill(0.0);
   hw_cmd_velocities_.fill(0.0);
   hw_cmd_efforts_.fill(0.0);
-  hw_cmd_kp_.fill(0.0);
-  hw_cmd_kd_.fill(0.0);
+  hw_cmd_kp_.fill(kFallbackKp);
+  hw_cmd_kd_.fill(kFallbackKd);
   hw_state_positions_.fill(0.0);
   hw_state_velocities_.fill(0.0);
   hw_state_currents_.fill(0.0);
@@ -404,8 +402,8 @@ auto Revo3HandHardware::write(const rclcpp::Time & /*time*/, const rclcpp::Durat
   Revo3Api::MitCommand cmd{};
   for (std::size_t i = 0; i < kJointCount; ++i)
   {
-    const double kp = hw_cmd_kp_[i] > 0.0 ? hw_cmd_kp_[i] : kFallbackKp;
-    const double kd = hw_cmd_kd_[i] > 0.0 ? hw_cmd_kd_[i] : kFallbackKd;
+    const double kp = mit_gain_or_default(hw_cmd_kp_[i], kFallbackKp);
+    const double kd = mit_gain_or_default(hw_cmd_kd_[i], kFallbackKd);
     cmd.kp[i]         = static_cast<float>(kp);
     cmd.kd[i]         = static_cast<float>(kd);
     cmd.positions[i]  = static_cast<float>(hw_cmd_positions_[i]  * kRadToDeg);

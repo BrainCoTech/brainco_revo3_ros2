@@ -118,4 +118,10 @@ ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME})
 ament_export_dependencies(pluginlib rclcpp rclcpp_lifecycle hardware_interface)
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_mit_gains test/test_mit_gains.cpp)
+  target_include_directories(test_mit_gains PRIVATE include)
+endif()
+
 ament_package()
