@@ -41,20 +41,10 @@ namespace
 {
 /// Discover all hardware serial ports in /dev/ (ttyUSB*, ttyACM*, ttyCH343USB*, ttyS*, etc.).
 /// Excludes virtual consoles (tty0-tty63) by matching tty[A-Z]+ prefix.
-/// When hint is non-empty, only the hinted port is scanned.
-std::vector<std::string> scan_serial_ports(const std::string & hint = "")
+/// When hint is non-empty, only serial device paths with that prefix are scanned.
+std::vector<std::string> scan_serial_ports(const std::string & port_prefix = "")
 {
   std::vector<std::string> ports;
-
-  if (!hint.empty())
-  {
-    if (std::filesystem::exists(hint))
-    {
-      ports.push_back(hint);
-    }
-    return ports;
-  }
-
   const std::regex serial_re(R"(^tty[A-Z])");  // starts with "tty" + uppercase letter
   std::error_code ec;
 
@@ -63,9 +53,11 @@ std::vector<std::string> scan_serial_ports(const std::string & hint = "")
     if (ec) { break; }
     if (!entry.is_character_file(ec)) { continue; }
     const std::string name = entry.path().filename().string();
-    if (std::regex_search(name, serial_re))
+    const std::string path = entry.path().string();
+    if (std::regex_search(name, serial_re) &&
+        (port_prefix.empty() || path.rfind(port_prefix, 0) == 0))
     {
-      ports.push_back(entry.path().string());
+      ports.push_back(path);
     }
   }
 
@@ -135,15 +127,13 @@ bool ModbusSession::open()
       "Auto-detecting Revo3 device (requested slave_id: %u, quick: %s)",
       requested_slave_id, config_.modbus.auto_detect_quick ? "true" : "false");
 
-    // Use auto_detect_port if set; otherwise fall back to configured port
-    // to avoid scanning all serial ports (which can hang on non-Revo3 devices).
+    // Only auto_detect_port restricts discovery. The configured port field is
+    // ignored in auto-detect mode; an empty hint must scan all serial ports.
     // Resolve symlinks because the SDK may not follow them natively.
     const char * hint = nullptr;
     std::string  hint_holder;
     if (!config_.modbus.auto_detect_port.empty()) {
       hint_holder = config_.modbus.auto_detect_port;
-    } else if (!config_.modbus.port.empty()) {
-      hint_holder = config_.modbus.port;
     }
     if (!hint_holder.empty()) {
       // Resolve symlinks (e.g. /dev/revo3_hand_left -> /dev/ttyCH343USB1)
@@ -159,7 +149,7 @@ bool ModbusSession::open()
     // --- Port scan fallback ---
     if (!best_connection)
     {
-      auto ports = scan_serial_ports(hint ? std::string(hint) : "");
+      auto ports = scan_serial_ports(hint_holder);
       for (const auto & port : ports)
       {
         best_connection = detect_modbus_revo3(port.c_str(), requested_slave_id);
